@@ -1,9 +1,11 @@
 package dev.lilkuzco.dragons.client;
 
+import dev.lilkuzco.dragons.entity.DragonEntity;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.server.level.ServerLevel;
 
 /**
  * The render battery.
@@ -39,6 +41,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 public class DragonsRenderTest implements FabricClientGameTest {
 	private static final String[] VARIANTS =
 			{"crimson", "emerald", "sapphire", "amethyst", "amber", "obsidian", "ivory"};
+	/** Independent tamings to average. One draw cannot tell 5% from 100%. */
+	private static final int TAMING_ROUNDS = 5;
+	/** Give-up point per round. 0.95^400 is about one in a hundred million. */
+	private static final int FEED_LIMIT = 400;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -176,7 +182,98 @@ public class DragonsRenderTest implements FabricClientGameTest {
 			context.waitTicks(150);
 			context.takeScreenshot("dragon_leashed");
 			server.runCommand("execute at @p run dragons census");
+
+			// ---- 8. taming, for real, five times ------------------------------------
+			// Everything above stages state with NBT. This plays the game: a landed
+			// dragon, raw chicken and the use key, until it gives in.
+			//
+			// Five separate dragons rather than one, because ONE taming cannot tell 5%
+			// from 100% — a single feed succeeding is a perfectly ordinary 1-in-20 event.
+			// Five geometric draws at p=0.05 average about 20 feeds each; five draws at
+			// p=1.0 average exactly 1. The logged mean is what distinguishes them, and it
+			// is the only check on the rate that does not just restate the constant.
+			int[] counts = new int[TAMING_ROUNDS];
+			for (int round = 0; round < TAMING_ROUNDS; round++) {
+				clear(server);
+				stage(context, server);
+				server.runCommand("execute at @p run summon dragons:dragon ~ ~ ~4 "
+						+ "{Rotation:[0f,0f],dragons_rest:20000,dragons_variant:\"amethyst\"}");
+				server.runCommand("give @p minecraft:chicken 64");
+				context.waitTicks(50);
+
+				int feeds = 0;
+				while (!tamed(server) && feeds < FEED_LIMIT) {
+					// re-aim every feed: the dragon is a live mob and drifts, and a
+					// right-click that misses is a feed this loop would never make
+					server.runCommand(
+							"execute at @e[type=dragons:dragon,limit=1] run tp @p ~ ~ ~-3 0 0");
+					context.getInput().pressKey(options -> options.keyUse);
+					context.waitTicks(6);
+					feeds++;
+					if (round == 0 && feeds == 1) {
+						// the wolf burst: smoke on a refusal, hearts on an acceptance
+						context.takeScreenshot("dragon_taming_attempt");
+					}
+					if (feeds % 50 == 0) {
+						server.runCommand("give @p minecraft:chicken 64");
+					}
+				}
+				if (!tamed(server)) {
+					throw new AssertionError("round " + round + ": " + FEED_LIMIT
+							+ " raw chicken and still untamed. At 5% that is a 1-in-10^8 "
+							+ "event, so the feed path is broken, not unlucky.");
+				}
+				counts[round] = feeds;
+				server.runCommand("execute at @p run say taming round " + round + ": "
+						+ feeds + " raw chicken");
+				if (round == 0) {
+					context.waitTicks(20);
+					context.takeScreenshot("dragon_tamed");
+					// and now that it IS tamed, canUseSlot lets the saddle on — the same
+					// command that correctly bounces off an untamed dragon
+					server.runCommand("execute as @e[type=dragons:dragon] run item replace "
+							+ "entity @s saddle with dragons:dragon_saddle");
+					context.waitTicks(30);
+					context.takeScreenshot("dragon_tamed_saddled");
+					server.runCommand("execute at @p run dragons census");
+				}
+			}
+
+			int total = 0;
+			StringBuilder line = new StringBuilder();
+			for (int round = 0; round < counts.length; round++) {
+				total += counts[round];
+				line.append(round == 0 ? "" : ", ").append(counts[round]);
+			}
+			double mean = (double) total / counts.length;
+			server.runCommand("execute at @p run say TAMING RATE: counts [" + line + "]"
+					+ " mean " + String.format("%.1f", mean) + " chicken per dragon"
+					+ " (expected ~20 at 5%, exactly 1.0 if the roll were certain)");
+			// Threshold picked for the FALSE-ALARM rate, not for tightness: five geometric
+			// draws at p=0.05 sum to 12 or less about twice in ten thousand runs, so this
+			// gate effectively never fires by chance — while a roll that always succeeds
+			// gives exactly 1.0 and a coin flip gives 2.0. It is a "the roll is not really
+			// rolling" alarm, not an estimator.
+			if (mean < 2.5) {
+				throw new AssertionError("mean of " + mean + " chicken over " + counts.length
+						+ " tamings is far too low for a 5% roll (expected ~20) — the roll is "
+						+ "not doing what it claims");
+			}
 		}
+	}
+
+	/** Is any dragon in the world tame? Asked of the server, not scraped from chat. */
+	private static boolean tamed(TestServerContext server) {
+		return server.computeOnServer(minecraftServer -> {
+			for (ServerLevel level : minecraftServer.getAllLevels()) {
+				for (var entity : level.getAllEntities()) {
+					if (entity instanceof DragonEntity dragon && dragon.isTame()) {
+						return true;
+					}
+				}
+			}
+			return false;
+		});
 	}
 
 	/** A flat stone floor with the player standing on it, facing south and slightly down. */
