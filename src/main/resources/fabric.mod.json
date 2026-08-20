@@ -3,7 +3,7 @@
 	"id": "dragons",
 	"version": "${version}",
 	"name": "Dragons",
-	"description": "Seven colours of wild dragon that perch, fly around the world instead of through it, and can be tamed with raw chicken and ridden with a crafted dragon saddle.",
+	"description": "Seven colours of dragon. Hatch a found egg beside a campfire, win the hatchling over with raw chicken, saddle it and fly. Unlike the Ender Dragon it flies around the world instead of through it.",
 	"authors": [
 		"lilkuzco-dev"
 	],

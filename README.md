@@ -67,6 +67,12 @@ Then right-click to mount. Controls are the happy ghast's: look where you want t
 hold forward, jump to climb, nose down and forward to descend and land. Shears take the
 saddle back off; sneak-right-click toggles sit/stay.
 
+Cruising speed is **~24 blocks/s** — a shade over an unboosted elytra glide. That number is
+measured by the render battery on every run rather than read off the `FLYING_SPEED`
+attribute, because the attribute does not mean what it looks like: it enters the speed
+calculation once or twice depending on whether the input clears `getInputVector`'s length
+cap, so the same value can produce 9 blocks/s or 220.
+
 ### 5. Park it
 
 A **lead** works on a dragon. A leashed dragon will not start a flight, so tying one to a

@@ -1,6 +1,7 @@
 package dev.lilkuzco.dragons.entity;
 
 import dev.lilkuzco.dragons.Dragons;
+import com.mojang.serialization.Codec;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,6 +29,9 @@ public enum DragonVariant {
 	IVORY("ivory");
 
 	public static final List<DragonVariant> ALL = List.of(values());
+	/** For the egg block's own codec, so all seven blocks are not one colour on paper. */
+	public static final Codec<DragonVariant> CODEC =
+			Codec.STRING.xmap(DragonVariant::byName, DragonVariant::id);
 	private static final Map<String, DragonVariant> BY_NAME =
 			ALL.stream().collect(Collectors.toUnmodifiableMap(DragonVariant::id, Function.identity()));
 

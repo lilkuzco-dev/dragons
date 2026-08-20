@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * The render battery.
@@ -45,6 +46,8 @@ public class DragonsRenderTest implements FabricClientGameTest {
 	private static final int TAMING_ROUNDS = 5;
 	/** Give-up point per round. 0.95^400 is about one in a hundred million. */
 	private static final int FEED_LIMIT = 400;
+	/** Long enough to average out a tick of jitter, short enough to stay in loaded chunks. */
+	private static final int FLIGHT_SAMPLE_TICKS = 40;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -236,6 +239,7 @@ public class DragonsRenderTest implements FabricClientGameTest {
 					context.waitTicks(30);
 					context.takeScreenshot("dragon_tamed_saddled");
 					server.runCommand("execute at @p run dragons census");
+					flightTest(context, server);
 				}
 			}
 
@@ -259,7 +263,124 @@ public class DragonsRenderTest implements FabricClientGameTest {
 						+ " tamings is far too low for a 5% roll (expected ~20) — the roll is "
 						+ "not doing what it claims");
 			}
+
+			// ---- 9. the hatchling hour running out ----------------------------------
+			clear(server);
+			stage(context, server);
+			bondExpiryTest(context, server);
 		}
+	}
+
+	/**
+	 * Mount the dragon we just tamed and fly it, then measure how fast it actually went.
+	 *
+	 * <p>Riding is the one headline feature no screenshot can check and no NBT can stage:
+	 * it needs a real mount, a real key held down and a real controlling passenger, and
+	 * every gate on the way (owner, saddled, grown) has to pass for any of it to happen.
+	 *
+	 * <p>The speed is measured rather than derived because deriving it went wrong twice.
+	 * It falls out of {@code getRiddenInput}, {@code getInputVector}'s length cap and
+	 * {@code travelFlying}'s drag together, and FLYING_SPEED enters that chain either once
+	 * or twice depending on which side of the cap it lands — so the same attribute value
+	 * can mean 9 blocks/s or 220. Reading the number off the attribute gave answers that
+	 * were out by 3x in one direction and 25x in the other. This measures it.
+	 */
+	private static void flightTest(ClientGameTestContext context, TestServerContext server) {
+		server.runCommand("ride @p mount @e[type=dragons:dragon,limit=1]");
+		context.waitTicks(20);
+		if (!ridden(server)) {
+			throw new AssertionError("mounting a tamed, saddled, owned dragon did not take — "
+					+ "getControllingPassenger is refusing its own owner");
+		}
+		context.takeScreenshot("dragon_ridden");
+
+		context.getInput().holdKey(options -> options.keyUp);
+		context.waitTicks(30);                       // spend the acceleration curve first
+		double[] from = dragonPos(server);
+		context.waitTicks(FLIGHT_SAMPLE_TICKS);
+		double[] to = dragonPos(server);
+		context.getInput().releaseKey(options -> options.keyUp);
+
+		double dx = to[0] - from[0];
+		double dy = to[1] - from[1];
+		double dz = to[2] - from[2];
+		double blocksPerSecond = Math.sqrt(dx * dx + dy * dy + dz * dz)
+				/ FLIGHT_SAMPLE_TICKS * 20.0;
+		server.runCommand("execute at @p run say RIDDEN SPEED: "
+				+ String.format("%.1f", blocksPerSecond) + " blocks/s over "
+				+ FLIGHT_SAMPLE_TICKS + " ticks (want ~24, a shade over elytra glide)");
+		context.takeScreenshot("dragon_ridden_flight");
+		if (blocksPerSecond < 12.0) {
+			throw new AssertionError("ridden dragon moved at " + blocksPerSecond
+					+ " blocks/s, well under the ~24 this is tuned for — either the rider's "
+					+ "input is not reaching travel() or FLYING_SPEED has drifted down");
+		}
+		if (blocksPerSecond > 80.0) {
+			throw new AssertionError("ridden dragon moved at " + blocksPerSecond
+					+ " blocks/s, which outruns chunk loading — FLYING_SPEED is being read "
+					+ "as though getInputVector did not normalise the input");
+		}
+		server.runCommand("ride @p dismount");
+		context.waitTicks(20);
+	}
+
+	/** Is a player actually in control of a dragon? */
+	private static boolean ridden(TestServerContext server) {
+		return server.computeOnServer(minecraftServer -> {
+			for (ServerLevel level : minecraftServer.getAllLevels()) {
+				for (var entity : level.getAllEntities()) {
+					if (entity instanceof DragonEntity dragon
+							&& dragon.getControllingPassenger() instanceof Player) {
+						return true;
+					}
+				}
+			}
+			return false;
+		});
+	}
+
+	private static double[] dragonPos(TestServerContext server) {
+		return server.computeOnServer(minecraftServer -> {
+			for (ServerLevel level : minecraftServer.getAllLevels()) {
+				for (var entity : level.getAllEntities()) {
+					if (entity instanceof DragonEntity dragon) {
+						return new double[] {dragon.getX(), dragon.getY(), dragon.getZ()};
+					}
+				}
+			}
+			throw new AssertionError("no dragon left to measure");
+		});
+	}
+
+	/**
+	 * The hatchling hour, without waiting an hour.
+	 *
+	 * <p>The bond is stored as an absolute game time precisely so that it does not depend
+	 * on anything having ticked, which means a deadline already in the past is a completely
+	 * legitimate state to load — not a shortcut around the logic but the same arithmetic
+	 * the real case does an hour later.
+	 */
+	private static void bondExpiryTest(ClientGameTestContext context, TestServerContext server) {
+		server.runCommand("execute at @p run summon dragons:dragon ~ ~ ~5 "
+				+ "{Age:-24000,dragons_variant:\"emerald\",dragons_bonded_to:[I;1,2,3,4],"
+				+ "dragons_bond_expires:1L}");
+		context.waitTicks(40);
+		boolean left = server.computeOnServer(minecraftServer -> {
+			for (ServerLevel level : minecraftServer.getAllLevels()) {
+				for (var entity : level.getAllEntities()) {
+					if (entity instanceof DragonEntity dragon && dragon.hasLeftForGood()) {
+						return true;
+					}
+				}
+			}
+			return false;
+		});
+		server.runCommand("execute at @p run dragons census");
+		if (!left) {
+			throw new AssertionError("a hatchling whose bond deadline is in the past never "
+					+ "gave up on its player — the hour would never end");
+		}
+		context.takeScreenshot("dragon_bond_expired");
 	}
 
 	/** Is any dragon in the world tame? Asked of the server, not scraped from chat. */

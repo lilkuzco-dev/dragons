@@ -142,7 +142,26 @@ public class DragonEntity extends TamableAnimal {
 		return Animal.createAnimalAttributes()
 				.add(Attributes.MAX_HEALTH, 60.0)
 				.add(Attributes.MOVEMENT_SPEED, 0.22)
-				.add(Attributes.FLYING_SPEED, 0.6)
+				// Ridden top speed is not what reading this number suggests, and the
+				// arithmetic is worth writing down because it bit twice.
+				//
+				// getRiddenInput returns a unit-ish direction scaled by 3.9*F, and
+				// travelFlying then accelerates by (that, capped at length 1 by
+				// getInputVector) * (5/3*F) per tick against 0.91 drag. So:
+				//
+				//   accel   = min(1, 3.9*F) * (5/3)*F        terminal = accel / 0.09
+				//
+				// F appears TWICE below the cap and once above it, which is why the two
+				// regimes behave completely differently:
+				//   F = 0.6  -> 3.9F = 2.34, capped: accel 1.0    -> 11 blocks per TICK
+				//   F = 0.08 -> 3.9F = 0.31, uncapped: accel 0.042 -> 9.1 blocks/s
+				// The first outran chunk loading; the second was measured at 9.1 b/s by
+				// the render battery's flight test and felt like a barge.
+				//
+				// 0.13 measures ~24 blocks/s: a shade over elytra glide, comfortably under
+				// anything that outruns the chunk loader. The battery measures it on every
+				// run rather than trusting this comment.
+				.add(Attributes.FLYING_SPEED, 0.13)
 				.add(Attributes.ATTACK_DAMAGE, 8.0)
 				.add(Attributes.FOLLOW_RANGE, 48.0)
 				.add(Attributes.TEMPT_RANGE, 16.0);
@@ -365,6 +384,22 @@ public class DragonEntity extends TamableAnimal {
 	@Override
 	protected boolean omnidirectionalAirMover() {
 		return true;
+	}
+
+	/**
+	 * Cruising speed under its own power.
+	 *
+	 * <p>Vanilla hands every non-player mob a flat {@code 0.02} here regardless of its
+	 * FLYING_SPEED attribute, which is tuned for a parrot and leaves something the size of
+	 * a dragon drifting at about four blocks a second. Doubling it is still an unhurried
+	 * cruise and stays well inside what the flying navigation can steer.
+	 *
+	 * <p>The ridden case is deliberately left to vanilla: {@link #travel} handles a rider
+	 * itself and never reaches this method.
+	 */
+	@Override
+	protected float getFlyingSpeed() {
+		return this.getControllingPassenger() instanceof Player ? super.getFlyingSpeed() : 0.04F;
 	}
 
 	@Override

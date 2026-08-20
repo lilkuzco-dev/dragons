@@ -1,6 +1,7 @@
 package dev.lilkuzco.dragons.block;
 
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.lilkuzco.dragons.entity.DragonEntity;
 import dev.lilkuzco.dragons.entity.DragonVariant;
 import dev.lilkuzco.dragons.entity.DragonsEntities;
@@ -55,8 +56,17 @@ import org.jspecify.annotations.Nullable;
  * simply waits, re-checking, until there is a fire again.
  */
 public class DragonEggBlock extends BaseEntityBlock {
-	public static final MapCodec<DragonEggBlock> CODEC = simpleCodec(properties ->
-			new DragonEggBlock(DragonVariant.CRIMSON, properties));
+	/**
+	 * Carries the variant, because all seven egg blocks share this codec.
+	 * {@code simpleCodec} would have encoded every one of them as crimson — harmless in
+	 * ordinary play, since nothing round-trips a block through its codec, and exactly the
+	 * kind of quietly-wrong thing that surfaces the first time something does.
+	 */
+	public static final MapCodec<DragonEggBlock> CODEC = RecordCodecBuilder.mapCodec(instance ->
+			instance.group(
+					DragonVariant.CODEC.fieldOf("variant").forGetter(DragonEggBlock::variant),
+					propertiesCodec()
+			).apply(instance, DragonEggBlock::new));
 
 	/** Blocks of slack between egg and fire, measured as a sphere. */
 	public static final int CAMPFIRE_RADIUS = 5;
