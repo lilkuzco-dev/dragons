@@ -3,7 +3,7 @@
 	"id": "dragons",
 	"version": "${version}",
 	"name": "Dragons",
-	"description": "Seven colours of dragon. Hatch a found egg beside a campfire, win the hatchling over with raw chicken, saddle it and fly. Unlike the Ender Dragon it flies around the world instead of through it.",
+	"description": "Seven colours of dragon. Take a castle for an egg, hatch it beside a campfire, win the hatchling over with raw chicken, saddle it and fly. Unlike the Ender Dragon it flies around the world instead of through it.",
 	"authors": [
 		"lilkuzco-dev"
 	],
@@ -29,5 +29,8 @@
 		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*"
+	},
+	"recommends": {
+		"warfront": "*"
 	}
 }

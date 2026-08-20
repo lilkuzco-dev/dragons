@@ -1,8 +1,9 @@
 # Dragons
 
-Seven colours of dragon for Minecraft 26.2 (Fabric). You find an egg, hatch it beside a
-campfire, and win the hatchling over with raw chicken before it decides you were not worth
-waiting for. A grown, tamed dragon takes a crafted saddle and flies.
+Seven colours of dragon for Minecraft 26.2 (Fabric).
+You take a castle for an egg, hatch it beside a campfire, and win the hatchling over with
+raw chicken before it decides you were not worth waiting for. A grown, tamed dragon takes a
+crafted saddle and flies.
 
 The mob wears vanilla's Ender Dragon **model** and nothing else of the boss. In particular
 it does not carve holes in the world — see [Not a wrecking ball](#not-a-wrecking-ball).
@@ -11,22 +12,30 @@ it does not carve holes in the world — see [Not a wrecking ball](#not-a-wrecki
 
 ## Getting a dragon
 
-### 1. Find an egg
+### 1. Take a castle
 
-Dragon eggs are treasure. They appear in a handful of loot tables, weighted towards places
-an expedition already goes:
+Dragon eggs come from **Warfront castle chests and nowhere else**. There is no other source:
+you get a dragon by taking a castle.
 
-| chest | chance |
-|---|---|
-| End city treasure | 30% |
-| Bastion treasure | 15% |
-| Woodland mansion | 10% |
-| Nether fortress | 8% |
-| Stronghold library | 8% |
-| Desert pyramid | 6% |
+| loot table | chests per castle | chance per chest | eggs per castle |
+|---|---|---|---|
+| `warfront:castle/aegis` | 17 | 5% | ~0.85 |
+| `warfront:castle/dracula` | 16 | 5% | ~0.80 |
+| `warfront:castle/sarab` | 24 | 5% | ~1.2 |
+| `warfront:castle/vostok` | 24 | 5% | ~1.2 |
+| `warfront:castle/hidden_vault` | — | 50% | (no structure uses this table yet) |
 
-Each roll picks one of the seven colours uniformly, and the colour of the egg is the colour
-of the dragon inside it.
+The chance per chest looks tiny because a castle is one structure holding sixteen to
+twenty-four chests, all rolling the same table. The number that matters is chests × chance,
+which comes out at roughly **one egg per castle taken** — usually one, sometimes two,
+sometimes none. Each egg that does roll picks one of the seven colours uniformly, and the
+colour of the egg is the colour of the dragon inside it.
+
+> **Without Warfront installed, dragons cannot be obtained in survival at all.** That is a
+> deliberate coupling, but a silent one would be miserable to diagnose, so the mod warns on
+> startup if Warfront is missing, warns again if a castle table it expects never loads
+> (Warfront renaming one looks identical to Warfront being absent), and `/dragons loot`
+> prints the current wiring on demand.
 
 ### 2. Hatch it
 
@@ -125,6 +134,9 @@ Read-only, for checking state that is invisible in a screenshot:
   resting/leashed, and how much of the hatchling hour is left
 - `/dragons eggs` — every egg nearby: whether it is warm, whether it is incubating, its
   visible stage and how long until it opens
+- `/dragons loot` — whether each castle loot table actually carries dragon eggs. This is the
+  one part of the mod the dev environment cannot test, because it keys off tables Warfront
+  owns and Warfront is not on the dev classpath
 
 ---
 

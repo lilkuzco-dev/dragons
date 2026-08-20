@@ -1,5 +1,6 @@
 package dev.lilkuzco.dragons.client;
 
+import dev.lilkuzco.dragons.DragonsLoot;
 import dev.lilkuzco.dragons.entity.DragonEntity;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -268,6 +269,34 @@ public class DragonsRenderTest implements FabricClientGameTest {
 			clear(server);
 			stage(context, server);
 			bondExpiryTest(context, server);
+
+			// ---- 10. the egg's only loot source --------------------------------------
+			// Eggs come from Warfront castle chests and from nowhere else, and Warfront is
+			// not on the dev classpath — so what CAN be checked here is the absence path,
+			// which is the one that would otherwise be silent. A player whose pack lacks
+			// Warfront must be told that dragons are unobtainable, not left looting
+			// forever. (The positive path is `/dragons loot` on a server that has it.)
+			server.runCommand("execute at @p run dragons loot");
+			boolean present = server.computeOnServer(minecraftServer -> DragonsLoot.warfrontPresent());
+			if (present) {
+				// the dev environment has grown a Warfront dependency; then the real
+				// assertion is available and every table must have been wired
+				for (var table : DragonsLoot.targets().keySet()) {
+					if (!DragonsLoot.wasSeen(table)) {
+						throw new AssertionError("warfront is loaded but " + table.identifier()
+								+ " never appeared during the loot reload — eggs will not "
+								+ "drop from it");
+					}
+				}
+			} else {
+				for (var table : DragonsLoot.targets().keySet()) {
+					if (DragonsLoot.wasSeen(table)) {
+						throw new AssertionError("warfront is NOT loaded, yet " + table.identifier()
+								+ " was modified — this mod is keyed to a table it does not "
+								+ "think it owns");
+					}
+				}
+			}
 		}
 	}
 
