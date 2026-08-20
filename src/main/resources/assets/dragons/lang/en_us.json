@@ -1,0 +1,13 @@
+{
+  "block.dragons.amber_dragon_egg": "Amber Dragon Egg",
+  "block.dragons.amethyst_dragon_egg": "Amethyst Dragon Egg",
+  "block.dragons.crimson_dragon_egg": "Crimson Dragon Egg",
+  "block.dragons.emerald_dragon_egg": "Emerald Dragon Egg",
+  "block.dragons.ivory_dragon_egg": "Ivory Dragon Egg",
+  "block.dragons.obsidian_dragon_egg": "Obsidian Dragon Egg",
+  "block.dragons.sapphire_dragon_egg": "Sapphire Dragon Egg",
+  "entity.dragons.dragon": "Dragon",
+  "item.dragons.dragon_saddle": "Dragon Saddle",
+  "item.dragons.dragon_spawn_egg": "Dragon Spawn Egg",
+  "itemGroup.dragons.dragons": "Dragons"
+}

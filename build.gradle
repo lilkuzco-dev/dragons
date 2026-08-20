@@ -1,0 +1,125 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+repositories {
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"dragons" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+
+	runs {
+		gametest {
+			inherit client
+			vmArg "-Dfabric.client.gametest"
+			runDir "build/run-gametest"
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
+}
+
+// ---------------------------------------------------------------------------
+// Ship gate. Runs against the REMAPPED jar — the artifact that actually ships —
+// and asserts its own anchors, so a refactor that stops it finding anything fails
+// the build instead of passing vacuously.
+//
+//   assetAudit  every asset path the mod can request must exist (checkerboards)
+//
+// This mod draws its dragons on VANILLA's EnderDragon model, so the audit also
+// holds every `minecraft:` path we hardcode against the real client jar — a
+// vanilla texture that gets renamed between versions is a silent checkerboard,
+// not an error (26.2 already did this to `entity/pig/pig_temperate.png`).
+// ---------------------------------------------------------------------------
+def vanillaJar = new File(gradle.gradleUserHomeDir,
+		"caches/fabric-loom/${project.minecraft_version}/minecraft-client.jar")
+
+tasks.register('assetAudit', Exec) {
+	group = 'verification'
+	description = 'Fails the build on any asset path the mod could request but does not ship'
+	dependsOn 'jar'
+	inputs.dir 'src'
+	inputs.file 'tools/asset-audit.py'
+	doFirst {
+		commandLine 'python3', 'tools/asset-audit.py',
+				'--jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath,
+				'--vanilla-jar', vanillaJar.absolutePath
+	}
+}
+
+// The render battery boots a throwaway world inside build/run-gametest. build/ is
+// disposable, so anything the run needs there has to be re-stamped each time.
+tasks.matching { it.name == 'runGametest' }.configureEach {
+	doFirst {
+		def runDir = file('build/run-gametest')
+		runDir.mkdirs()
+		new File(runDir, 'eula.txt').text =
+				"# written by the gametest run config; build/run-gametest is a throwaway dev server\n" +
+				"eula=true\n"
+	}
+}
+
+tasks.named('check') {
+	dependsOn 'assetAudit'
+}
+// `build` runs `check`, but wire it explicitly too so `gradlew build` can never
+// produce a jar that skipped the gate.
+tasks.named('build') {
+	dependsOn 'assetAudit'
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+
+	repositories {
+	}
+}

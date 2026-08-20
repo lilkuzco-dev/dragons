@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "dragons",
+	"version": "${version}",
+	"name": "Dragons",
+	"description": "Seven colours of wild dragon that perch, fly around the world instead of through it, and can be tamed with raw chicken and ridden with a crafted dragon saddle.",
+	"authors": [
+		"lilkuzco-dev"
+	],
+	"contact": {
+		"sources": "https://github.com/lilkuzco-dev/dragons"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/dragons/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.lilkuzco.dragons.Dragons"
+		],
+		"client": [
+			"dev.lilkuzco.dragons.client.DragonsClient"
+		],
+		"fabric-client-gametest": [
+			"dev.lilkuzco.dragons.client.DragonsRenderTest"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

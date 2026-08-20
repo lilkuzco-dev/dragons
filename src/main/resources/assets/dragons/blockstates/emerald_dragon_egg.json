@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "incubation=0": {
+      "model": "dragons:block/emerald_dragon_egg"
+    },
+    "incubation=1": {
+      "model": "dragons:block/emerald_dragon_egg"
+    },
+    "incubation=2": {
+      "model": "dragons:block/emerald_dragon_egg_cracked"
+    },
+    "incubation=3": {
+      "model": "dragons:block/emerald_dragon_egg_cracked"
+    }
+  }
+}
